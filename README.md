@@ -1,51 +1,111 @@
-# Auto-Resume: Rate Limit Handling for Freshworks Platform 3.0
 
-Automatically handle API rate limits (HTTP 429) in long-running batch operations. When rate limits interrupt your process, this app automatically pauses and resumes from exactly where it stopped—no manual intervention required.
+Auto-Resume: Rate Limit Resiliency Engine
+=========================================
 
-## What It Does
+An enterprise-grade reference implementation for handling high-volume operations on Freshworks Platform 3.0. This app provides a self-healing mechanism for batch processes by automatically navigating HTTP 429 (Rate Limit) constraints through state-managed resume logic.
 
-Process thousands of records without worrying about rate limits. The app detects HTTP 429 errors, schedules an automatic resume, and continues processing seamlessly until completion.
+* * * * *
 
-**Perfect for**: Bulk ticket creation, data imports, batch updates, migrations, and any large-scale Freshdesk operations.
+🚀 Architectural Overview
+-------------------------
 
-## How It Works
+When executing large-scale operations, API rate limits are an expected constraint. This engine eliminates manual retry overhead by implementing a "Pause-and-Resume" state machine.
 
-1. **Detects** rate limits (HTTP 429) during batch operations
-2. **Pauses** and schedules a resume event with continuation data
-3. **Resumes** automatically from the last successful record
-4. **Completes** the entire operation without manual intervention
+### Logic Flow
 
-## Key Features
+1.  **Execution**: The app initiates a bulk operation (e.g., Ticket Creation).
 
-- ✅ Automatic resume on rate limits
-- ✅ State preservation (no duplicate processing)
-- ✅ Error differentiation (rate limits vs. fatal errors)
-- ✅ Configurable delay between retries
+2.  **Detection**: Intercepts `429 Too Many Requests` status codes via Request Templates.
 
-## Quick Start
+3.  **Persistence**: Saves the current cursor/index and remaining payload to the Platform Database ($db$).
 
-```bash
-git clone <repository>
+4.  **Rescheduling**: Triggers a `onScheduledEvent` to re-awaken the process after the rate-limit reset window.
+
+5.  **Recovery**: Resumes processing from the exact checkpoint without data duplication.
+
+* * * * *
+
+🔗 Feature to Implementation Mapping
+------------------------------------
+
+| **Functionality** | **Platform Module** | **Engineering Rationale** |
+| --- | --- | --- |
+| **Fault Tolerance** | Request Templates | Intercepts HTTP 429 status globally to trigger backoff logic. |
+| **State Recovery** | Data API ($db$) | Stores the "last successful record" index to prevent duplicate entity creation. |
+| **Deferred Execution** | Scheduled Events | Offloads the wait-time to the platform scheduler, freeing up active runtime. |
+| **Secure Handshake** | SMI | Encapsulates heavy batch logic in a secure, server-side environment. |
+
+* * * * *
+
+🛠 Tech Stack
+-------------
+
+-   **Platform:** Freshworks Platform v3.0
+
+-   **Runtime:** Node.js 18.20.8
+
+-   **FDK Version:** 9.7.4
+
+-   **Key APIs:** SMI, $db$, Scheduled Events, Request Templates
+
+* * * * *
+
+📋 Use Case Scenarios (High-Volume)
+-----------------------------------
+
+| **Scenario** | **Application** |
+| --- | --- |
+| **Peak Events** | Handling 500k+ tickets during flash sales (e.g., Klipkart's Big Million Day). |
+| **Data Migration** | Moving 5+ years of historical support data into Freshdesk. |
+| **Sync Operations** | Importing 50k+ customer contacts from external CRMs. |
+| **Bulk Updates** | Re-assigning thousands of tickets during organizational restructuring. |
+
+* * * * *
+
+⚡ Quick Start
+-------------
+
+### 1\. Installation
+
+Bash
+
+```
+git clone <repository-url>
 cd auto-resume
-fdk run
+npm install
+
 ```
 
-Configure your Freshdesk API credentials through the FDK interface. See `USECASE.md` for real-world scenarios.
+### 2\. Configuration
 
-## Tech Stack
+Define your rate-limit thresholds and API credentials in `config/iparams.json`.
 
-- **Platform**: Freshworks Platform 3.0
-- **Runtime**: Node.js 18.20.8
-- **FDK**: 9.7.4
+### 3\. Execution
 
-## Platform Features Demonstrated
+Bash
 
-- Serverless Method Invocation (SMI)
-- Scheduled Events for resume logic
-- Request Templates for API calls
-- Event Handlers (onScheduledEvent)
+```
+fdk run
 
-## Use Cases
+```
+
+*Append `?dev=true` to your Freshdesk URL to test the SMI triggers and resume logic in real-time.*
+
+* * * * *
+
+⚠️ Constraints & Considerations
+-------------------------------
+
+-   **Retention:** Mapping data in `$db` is purged after successful completion to stay within storage limits.
+
+-   **Scheduling:** Minimum schedule interval is 5 minutes as per platform guidelines.
+
+-   **Payload Size:** Large batch arrays are segmented to fit within the 100KB `$db` value limit.
+
+* * * * *
+
+Use Cases
+-------------------------------
 
 Ideal for scenarios requiring:
 - Bulk data imports and migrations
