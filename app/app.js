@@ -201,7 +201,6 @@ function updateStatus(message) {
   }
 }
 
-// Expose handleSimulate for onclick (following 2.3 pattern)
-function handleSimulate() {
+window.handleSimulate = function handleSimulate() {
   createNTickets();
-}
+};
