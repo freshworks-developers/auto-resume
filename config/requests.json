@@ -1,11 +1,12 @@
 {
   "createTicket": {
     "schema": {
+      "protocol": "https",
       "method": "POST",
       "host": "<%= current_host.endpoint_urls.freshdesk %>",
       "path": "/api/v2/tickets",
       "headers": {
-        "Authorization": "Basic <%= encode(iparam.apikey) %>",
+        "Authorization": "Basic <%= encode(iparam.apikey + ':X') %>",
         "Content-Type": "application/json"
       }
     },

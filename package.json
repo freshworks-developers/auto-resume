@@ -1,5 +1,11 @@
 {
   "name": "ticket-burst-load-simulator",
   "version": "1.0.0",
-  "description": "Freshdesk Ticket Burst Load Simulator - Platform 3.0"
+  "description": "Freshdesk Ticket Burst Load Simulator - Platform 3.0",
+  "devDependencies": {
+    "@vitest/coverage-v8": "~2.1.8",
+    "vite": "~5.0.0",
+    "vitest": "~2.1.8",
+    "jsdom": "~26.1.0"
+  }
 }

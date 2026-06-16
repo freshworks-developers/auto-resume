@@ -134,13 +134,20 @@ function processResponseStatus(status) {
     return { success: true };
   }
 
+  if (status === 401 || status === 403) {
+    return {
+      status: 'failed',
+      error: 'Invalid API credentials. Check your Freshdesk API key in app settings.'
+    };
+  }
+
   if (isRateLimit(status)) {
     return { rateLimited: true };
   }
 
-  return { 
-    status: 'failed', 
-    error: `API error: ${status}` 
+  return {
+    status: 'failed',
+    error: `API error: ${status}`
   };
 }
 

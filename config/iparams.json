@@ -1,7 +1,7 @@
 {
   "apikey": {
     "display_name": "Freshdesk API Key",
-    "description": "Enter your Freshdesk API key (found in Profile Settings). Format: yourApiKey:X",
+    "description": "Agent API key from Profile Settings → View API Key. Enter the key only (the app appends :X for Basic auth).",
     "type": "text",
     "required": true,
     "secure": true

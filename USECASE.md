@@ -1,45 +1,50 @@
-# Use Cases - Klipkart
+Use Cases - Klipkart / Auto-Resume
+===================================
 
-## Company Overview
+Company Overview
+----------------
 
-**Klipkart** is an e-commerce platform using Freshdesk for customer support operations.
+**Klipkart** is an e-commerce platform using **Freshdesk** for customer support operations. During peak sale events and large-scale migrations, support operations must create or update tens of thousands of tickets without manual intervention when API rate limits are hit.
 
-## Use Case Scenarios
+* * * * *
 
-### 1. Big Million Day Event
+Use Case Scenarios
+------------------
 
-**Scenario**: During Klipkart's annual Big Million Day sale, millions of customers place orders, generating over 500,000 support tickets in Freshdesk within 48 hours. The support team needs to create tickets, assign priorities, and route them to appropriate agents based on order value and customer tier.
+### 1\. Big Million Day Event
 
-**Use Case**: The app processes all Big Million Day support tickets in Freshdesk. When API rate limits are hit due to the massive volume, the operation automatically pauses and resumes, ensuring every customer inquiry is captured and processed without manual intervention during the critical sale period.
+**Scenario**: During Klipkart's annual Big Million Day sale, over 500,000 support tickets are created within 48 hours. Standard API calls hit Freshdesk rate limits within minutes.
 
----
+**Use Case**: Auto-Resume processes tickets in batches via Request Templates. On HTTP 429, it saves the current cursor to `$db`, schedules a deferred resume job, and continues automatically after the rate-limit window resets — ensuring every customer inquiry is captured during the sale.
 
-### 2. Bulk Ticket Creation
+* * * * *
 
-**Scenario**: Klipkart needs to create thousands of support tickets in Freshdesk for a product recall campaign affecting 50,000 customers.
+### 2\. Bulk Ticket Creation
 
-**Use Case**: The app automatically creates tickets for all affected customers. When Freshdesk API rate limits are reached, the operation pauses and resumes automatically until all tickets are created.
+**Scenario**: Klipkart launches a product recall campaign requiring support tickets for 50,000 affected customers.
 
----
+**Use Case**: The app creates tickets in manageable chunks from the sidebar via SMI. When rate limits interrupt the run, processing pauses and resumes from the stored checkpoint without duplicating already-created tickets.
 
-### 3. Bulk Contact Import
+* * * * *
 
-**Scenario**: Klipkart imports 20,000 customer contacts from their CRM system into Freshdesk to enable support agents to access customer history.
+### 3\. Bulk Contact Import
 
-**Use Case**: The app imports all contacts into Freshdesk. If rate limits interrupt the import, the operation automatically continues from where it stopped without losing any data.
+**Scenario**: Klipkart imports 20,000 customer contacts from an external CRM into Freshdesk to give agents full customer history.
 
----
+**Use Case**: The same pause-and-resume engine applies to contact import batches. Progress persists in `$db` so a network blip or 429 response does not force operators to restart from record one.
 
-### 4. Bulk Ticket Updates
+* * * * *
 
-**Scenario**: Klipkart needs to update ticket priorities and assign them to agents for 15,000 tickets during a system migration.
+### 4\. Bulk Ticket Updates
 
-**Use Case**: The app updates all tickets in Freshdesk. When rate limits occur, the updates pause and automatically resume until all tickets are processed.
+**Scenario**: During a system migration, Klipkart must update priority and assignment on 15,000 open tickets.
 
----
+**Use Case**: Batch update operations use the identical checkpoint pattern. Scheduled events re-awaken the job after rate limits clear, and the cursor ensures each ticket is updated exactly once.
 
-### 5. Historical Data Migration
+* * * * *
 
-**Scenario**: Klipkart migrates 5 years of support tickets from their previous system into Freshdesk, totaling over 100,000 tickets.
+### 5\. Historical Data Migration
 
-**Use Case**: The app migrates all historical tickets to Freshdesk. Rate limit interruptions are handled automatically, ensuring complete migration without manual intervention.
+**Scenario**: Klipkart migrates five years of support history — over 100,000 tickets — from a legacy system into Freshdesk.
+
+**Use Case**: Auto-Resume serves as the migration engine for multi-hour runs. Self-healing resume logic manages API breathing room across rate-limit cycles, allowing unattended migration without operator babysitting.

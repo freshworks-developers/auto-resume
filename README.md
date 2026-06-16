@@ -1,116 +1,126 @@
+<p align="center">
+  <img src="auto-resume.png" alt="rate limit testing app" width="100%" />
+</p>
 
-Auto-Resume: Rate Limit Resiliency Engine
-=========================================
+# Auto-Resume — Klipkart Rate Limit Engine
 
-An enterprise-grade reference implementation for handling high-volume operations on Freshworks Platform 3.0. This app provides a self-healing mechanism for batch processes by automatically navigating HTTP 429 (Rate Limit) constraints through state-managed resume logic.
+A Freshworks Platform 3.0 sample app that demonstrates **rate-limit resilient bulk operations** using **Request Methods**, **Scheduled Events**, **SMI**, and the platform **key-value store** (`$db`).
 
-* * * * *
+## Description
 
-🚀 Architectural Overview
--------------------------
+High-volume ticket creation during flash sales or migrations routinely hits Freshdesk **429 Too Many Requests** responses. Auto-Resume saves progress to `$db`, schedules a deferred resume job, and continues from the last checkpoint — eliminating manual retry loops.
 
-When executing large-scale operations, API rate limits are an expected constraint. This engine eliminates manual retry overhead by implementing a "Pause-and-Resume" state machine.
+### Core Functionality
 
-### Logic Flow
+1. **Bulk ticket generation** — sidebar triggers serverless `start_generation` to create tickets via Request Templates.
+2. **429 detection** — intercepts rate-limit responses and persists cursor state to `$db`.
+3. **Scheduled resume** — `$schedule.create` re-awakens processing after the rate-limit window.
+4. **Checkpoint recovery** — resumes from the exact index without duplicating created tickets.
+5. **Install/uninstall lifecycle** — provisions and tears down schedules on app install and uninstall.
 
-1.  **Execution**: The app initiates a bulk operation (e.g., Ticket Creation).
+## User Interfaces
 
-2.  **Detection**: Intercepts `429 Too Many Requests` status codes via Request Templates.
-
-3.  **Persistence**: Saves the current cursor/index and remaining payload to the Platform Database ($db$).
-
-4.  **Rescheduling**: Triggers a `onScheduledEvent` to re-awaken the process after the rate-limit reset window.
-
-5.  **Recovery**: Resumes processing from the exact checkpoint without data duplication.
-
-* * * * *
-
-🔗 Feature to Implementation Mapping
-------------------------------------
-
-| **Functionality** | **Platform Module** | **Engineering Rationale** |
+| Surface | Placement | Behavior |
 | --- | --- | --- |
-| **Fault Tolerance** | Request Templates | Intercepts HTTP 429 status globally to trigger backoff logic. |
-| **State Recovery** | Data API ($db$) | Stores the "last successful record" index to prevent duplicate entity creation. |
-| **Deferred Execution** | Scheduled Events | Offloads the wait-time to the platform scheduler, freeing up active runtime. |
-| **Secure Handshake** | SMI | Encapsulates heavy batch logic in a secure, server-side environment. |
+| `app/index.html` | `support_ticket.ticket_sidebar` | Start bulk generation, view progress, trigger resume flow |
 
-* * * * *
+## Platform 3.0 Features Used
 
-🛠 Tech Stack
--------------
+### 1. Request Methods — Bulk Ticket Creation
 
--   **Platform:** Freshworks Platform v3.0
+`config/requests.json` defines a `createTicket` template. The serverless handler loops through a batch and catches HTTP 429 responses.
 
--   **Runtime:** Node.js 18.20.8
+### 2. Key-Value Store — Checkpoint Persistence
 
--   **FDK Version:** 9.7.4
-
--   **Key APIs:** SMI, $db$, Scheduled Events, Request Templates
-
-* * * * *
-
-📋 Use Case Scenarios (High-Volume)
------------------------------------
-
-| **Scenario** | **Application** |
-| --- | --- |
-| **Peak Events** | Handling 500k+ tickets during flash sales (e.g., Klipkart's Big Million Day). |
-| **Data Migration** | Moving 5+ years of historical support data into Freshdesk. |
-| **Sync Operations** | Importing 50k+ customer contacts from external CRMs. |
-| **Bulk Updates** | Re-assigning thousands of tickets during organizational restructuring. |
-
-* * * * *
-
-⚡ Quick Start
--------------
-
-### 1\. Installation
-
-Bash
-
-```
-git clone <repository-url>
-cd auto-resume
-npm install
-
+```javascript
+await $db.set('run:' + runId, { total, index, status: 'paused' });
 ```
 
-### 2\. Configuration
+Progress cursor and remaining payload are stored so a scheduled job can pick up where the batch stopped.
 
-Define your rate-limit thresholds and API credentials in `config/iparams.json`.
+### 3. Scheduled Events — Deferred Resume
 
-### 3\. Execution
+When rate limited, the app creates a short-lived schedule (minimum platform interval applies) to retry after the reset window:
 
-Bash
+```javascript
+await $schedule.create({ name: scheduleName, data: { runId, nextIndex }, schedule_at: resumeAt });
+```
+
+### 4. SMI — Serverless Method Invocation
+
+The sidebar invokes `start_generation` via `client.request.invoke` to run batch logic securely server-side.
+
+## Project Structure
 
 ```
+├── app/
+│   ├── index.html              # Sidebar — start/resume controls
+│   ├── app.js
+│   └── styles/
+├── config/
+│   ├── iparams.json
+│   └── requests.json           # createTicket template
+├── server/
+│   ├── server.js               # SMI + lifecycle + scheduled resume
+│   └── lib/handle-response.js
+├── manifest.json
+├── usecase.md
+└── README.md
+```
+
+## Prerequisites
+
+- [Freshworks CLI (FDK)](https://developers.freshworks.com/docs/app-sdk/v3.0/support_ticket/basic-dev-tools/freshworks-cli/) v10.1.2 or later
+- Node.js v24.x
+- A Freshdesk trial account with API access configured in installation parameters
+
+Enable global apps before local development:
+
+```bash
+fdk config set global_apps.enabled true
+```
+
+## Local Development
+
+1. Clone the repository:
+   ```bash
+   git clone <repo-url>
+   cd auto-resume
+   ```
+
+2. Install dependencies, validate, and run:
+   ```bash
+   npm install
+   fdk validate
+   fdk run
+   ```
+
+3. Configure installation parameters when prompted during install (or at `http://localhost:10001/custom_configs` when running locally):
+   - **Freshdesk API key** — agent key from Profile Settings (enter the key only; the app appends `:X` for Basic auth)
+
+4. Open Freshdesk with `?dev=true` and use the sidebar to start a bulk generation run:
+   ```
+   https://your-domain.freshdesk.com/a/tickets/1?dev=true
+   ```
+
+5. Simulate rate limits by lowering batch sizes in installation parameters and observe scheduled resume in the FDK logs.
+
+Reset local installation parameters when re-testing:
+
+```bash
+rm .fdk/store.sqlite
 fdk run
-
 ```
 
-*Append `?dev=true` to your Freshdesk URL to test the SMI triggers and resume logic in real-time.*
+## Key Learnings
 
-* * * * *
+1. **Secure iparams stay server-side** — `apikey` is marked `"secure": true`, so it is not returned to the frontend via `client.iparams.get()`. Auth runs in the serverless handler through `config/requests.json`.
+2. **Pause-and-resume** — never retry 429s in a tight loop; persist state and defer to `$schedule`.
+3. **Idempotent checkpoints** — store the last successful index so resumed runs skip already-created records.
+4. **Storage limits** — segment large batch arrays to stay within the 100 KB `$db` value limit; purge keys after successful completion.
 
-⚠️ Constraints & Considerations
--------------------------------
+## Resources
 
--   **Retention:** Mapping data in `$db` is purged after successful completion to stay within storage limits.
-
--   **Scheduling:** Minimum schedule interval is 5 minutes as per platform guidelines.
-
--   **Payload Size:** Large batch arrays are segmented to fit within the 100KB `$db` value limit.
-
-* * * * *
-
-Use Cases
--------------------------------
-
-Ideal for scenarios requiring:
-- Bulk data imports and migrations
-- Large-scale ticket operations
-- API synchronization
-- Batch processing of thousands of records
-
-See `USECASE.md` for detailed Klipkart use cases including Big Million Day event handling.
+- [Request methods](https://developers.freshworks.com/docs/app-sdk/v3.0/support_ticket/advanced-interfaces/request-method/)
+- [Scheduled events](https://developers.freshworks.com/docs/app-sdk/v3.0/common/serverless-apps/scheduled-events/)
+- [Serverless data store](https://developers.freshworks.com/docs/app-sdk/v3.0/common/serverless-apps/data-store/)
