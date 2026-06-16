@@ -128,64 +128,6 @@ function isRateLimit(status) {
   return status === 429;
 }
 
-// Helper: Check if response is success
-function isSuccessStatus(status) {
-  return status === 200 || status === 201;
-}
-
-// Helper: Handle success response (inspired by 2.3 pattern)
-function handleSuccessResponse(resp) {
-  console.log(JSON.stringify({
-    status: resp.status,
-    message: 'success'
-  }));
-  return { success: true };
-}
-
-// Helper: Handle error response
-function handleErrorResponse(err) {
-  return { 
-    status: 'failed', 
-    error: err.message || 'Unknown error',
-    errorStatus: err.status || err.statusCode 
-  };
-}
-
-// Helper: Handle non-success status response
-function handleStatusResponse(resp) {
-  if (isRateLimit(resp.status)) {
-    return { rateLimited: true };
-  }
-  return { 
-    status: 'failed', 
-    error: `API error: ${resp.status}` 
-  };
-}
-
-// Helper: Handle response (Platform 3.0 compatible, inspired by 2.3 pattern)
-function handleResponse(err, resp) {
-  // Success case
-  if (!err && resp && isSuccessStatus(resp.status)) {
-    return handleSuccessResponse(resp);
-  }
-  
-  // Error case
-  if (err) {
-    return handleErrorResponse(err);
-  }
-  
-  // Non-success status case
-  if (resp && resp.status) {
-    return handleStatusResponse(resp);
-  }
-  
-  // Invalid response
-  return { 
-    status: 'failed', 
-    error: 'Invalid response' 
-  };
-}
-
 // Helper: Process API response status (simplified version)
 function processResponseStatus(status) {
   if (status === 200 || status === 201) {
